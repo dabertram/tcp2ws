@@ -1,0 +1,87 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:		tcp2ws
+# Required-Start:	
+# Required-Stop:	
+# Default-Start:	2 3 4 5
+# Default-Stop:		1
+# Short-Description:	tcp2ws wrapper for rosbridge v2
+### END INIT INFO
+
+# Get lsb functions
+. /lib/lsb/init-functions
+
+# put absolute path for tcp2ws start-script into EXEC
+FILENAME="tcp2ws.py"
+PIDFILENAME="tcp2ws.pid"
+
+CURRENT_DIR="`pwd`"
+
+PIDFILE=$CURRENT_DIR"/"$PIDFILENAME
+EXEC=$CURRENT_DIR"/"$FILENAME
+
+#create argument array for tcp2ws call
+count=0
+for ARGUMENT in $*
+do
+	if [ $count -gt 0 ]
+	then OPTS=$OPTS" "$ARGUMENT
+	fi
+	count=`expr $count + 1`
+done
+
+# set working dir to allow python to write logfile to current directory
+#   not needed if you start tcp2ws.py (not *this* shell-script) from a shell
+OPTS=$OPTS" --working_dir "$CURRENT_DIR
+
+echo
+case "$1" in
+  start)
+	# check for existing PID-File..
+	#  if exists -> don't start tcp2ws, tell user to remove PID-File manually if no more tcp2ws process is running (check with top or ps)
+	if [ -s $PIDFILENAME ]; then
+		echo "pid-file already exists.. if no tcp2ws instance is running, just remove the file 'tcp2ws.pid' and try to restart"
+	else
+		echo "Starting tcp2ws"
+		if start-stop-daemon --start --make-pidfile --background --pidfile $PIDFILE --exec $EXEC -- $OPTS; then
+	#	if start-stop-daemon --start --quiet --make-pidfile --background --pidfile $PIDFILE --exec $EXEC -- $OPTS; then
+		echo "  tcp2ws started."
+		else
+		echo "  starting tcp2ws failed"
+		fi
+	fi
+	;;
+	
+  stop)
+	echo "Stopping tcp2ws"
+	
+	if start-stop-daemon --stop --pidfile $PIDFILE; then
+	echo "  tcp2ws stopped."
+	# remove PID-File
+	rm -f $PIDFILE
+	else
+	echo "  stopping tcp2ws failed."
+	fi
+	;;
+	
+  restart)
+	echo "Restarting tcp2ws"
+	start-stop-daemon --stop --retry 30 --pidfile $PIDFILE
+	
+	if start-stop-daemon --start --make-pidfile --background --pidfile $PIDFILE --exec $EXEC -- $OPTS; then
+#	if start-stop-daemon --start --quiet --make-pidfile --background --pidfile $PIDFILE --exec $EXEC -- $OPTS; then
+	    echo "restarted.."
+	else
+	    echo "error (restart)"
+	fi
+	;;
+	
+  status)
+        status_of_proc -p $PIDFILE $EXEC && exit 0 || exit $?
+        ;;
+  *)
+        echo "Usage: ./tcp2ws {start|stop|restart|status}"
+        exit 1
+esac
+
+exit 0
